@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+body {
+  background-color: theme('colors.blue.100');
+  overflow-x: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Custom animations for the wheel */
+@keyframes spin-ease-out {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(var(--rotation)); }
+}
+
+.animate-spin-wheel {
+  animation: spin-ease-out 5s cubic-bezier(0.15, 0, 0.15, 1) forwards;
+}
