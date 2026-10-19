@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import SuperMarioParty from './SuperMarioParty';
+import { MessageModal } from './ui';
+import { playFanfare } from './sounds';
 
 // --- CONSTANTS ---
 const DEFAULT_CHALLENGES = [
@@ -89,7 +91,7 @@ const PlayerSidebar = ({
   <div className={`${isOpen ? 'flex' : 'hidden'} lg:flex fixed lg:static inset-0 z-[110] lg:z-10 w-full sm:w-[24rem] xl:w-[28rem] bg-gradient-to-b from-emerald-500/95 to-teal-700/95 lg:from-emerald-500/80 lg:to-teal-700/80 backdrop-blur-xl lg:rounded-r-[4rem] p-6 xl:p-8 shadow-2xl lg:border-r-8 border-white/30 flex-col h-screen font-kids transition-all duration-300`}>
     <div className="flex justify-between items-center mb-6 lg:mb-8">
       <h3 className="text-3xl xl:text-4xl font-black text-white uppercase drop-shadow-md">Les Aventuriers</h3>
-      <button onClick={onClose} className="lg:hidden text-white text-4xl">✕</button>
+      <button onClick={onClose} aria-label="Fermer la liste des joueurs" className="lg:hidden text-white text-4xl">✕</button>
     </div>
     
     <div className="bg-white/20 p-4 rounded-3xl mb-6 flex flex-col gap-3 border-2 border-white/30">
@@ -108,15 +110,15 @@ const PlayerSidebar = ({
           <div className="flex-1 min-w-0">
             <p className="text-xl xl:text-2xl font-black text-white truncate leading-tight uppercase">{p.name}</p>
             <div className="flex items-center gap-2 mt-1">
-              <button onClick={() => updateScore(p.id, -1)} className="w-8 h-8 bg-red-400 text-white rounded-full font-black text-xl flex items-center justify-center">-</button>
+              <button onClick={() => updateScore(p.id, -1)} aria-label={`Enlever un point à ${p.name}`} className="w-8 h-8 bg-red-400 text-white rounded-full font-black text-xl flex items-center justify-center">-</button>
               <span className="text-xl font-bold text-amber-100">{p.score}</span>
-              <button onClick={() => updateScore(p.id, 1)} className="w-8 h-8 bg-emerald-400 text-white rounded-full font-black text-xl flex items-center justify-center">+</button>
+              <button onClick={() => updateScore(p.id, 1)} aria-label={`Ajouter un point à ${p.name}`} className="w-8 h-8 bg-emerald-400 text-white rounded-full font-black text-xl flex items-center justify-center">+</button>
             </div>
           </div>
-          <div className="flex flex-col gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-            <button onClick={() => movePlayer(i, 'up')} className="text-white text-xl hover:text-amber-300">▲</button>
-            <button onClick={() => removePlayer(p.id)} className="text-red-300 text-xl hover:text-red-500">🗑️</button>
-            <button onClick={() => movePlayer(i, 'down')} className="text-white text-xl hover:text-amber-300">▼</button>
+          <div className="flex flex-col gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+            <button onClick={() => movePlayer(i, 'up')} aria-label={`Monter ${p.name}`} className="text-white text-xl hover:text-amber-300">▲</button>
+            <button onClick={() => removePlayer(p.id)} aria-label={`Supprimer ${p.name}`} className="text-red-300 text-xl hover:text-red-500">🗑️</button>
+            <button onClick={() => movePlayer(i, 'down')} aria-label={`Descendre ${p.name}`} className="text-white text-xl hover:text-amber-300">▼</button>
           </div>
         </div>
       ))}
@@ -138,7 +140,8 @@ const App: React.FC = () => {
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>("");
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [finaleSoundUrl, setFinaleSoundUrl] = useState("https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"); // Fanfare
+  const [finaleSoundUrl, setFinaleSoundUrl] = useState(""); // vide = fanfare intégrée
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Game State
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -215,6 +218,7 @@ const App: React.FC = () => {
     const data = {
       version: "1.0",
       challenges,
+      players,
       finaleSoundUrl,
       isVoiceEnabled
     };
@@ -238,10 +242,11 @@ const App: React.FC = () => {
           setChallenges(data.challenges);
           if (data.finaleSoundUrl) setFinaleSoundUrl(data.finaleSoundUrl);
           if (data.isVoiceEnabled !== undefined) setIsVoiceEnabled(data.isVoiceEnabled);
-          alert("Configuration importée avec succès !");
+          if (Array.isArray(data.players)) setPlayers(data.players);
+          setNotice("Configuration importée avec succès !");
         }
-      } catch (err) {
-        alert("Erreur lors de l'importation du fichier.");
+      } catch {
+        setNotice("Erreur lors de l'importation du fichier.");
       }
     };
     reader.readAsText(file);
@@ -260,8 +265,13 @@ const App: React.FC = () => {
   };
 
   const playFinale = () => {
-    const audio = new Audio(finaleSoundUrl);
-    audio.play().catch(e => console.log("Audio play blocked", e));
+    if (finaleSoundUrl.trim()) {
+      const audio = new Audio(finaleSoundUrl);
+      audio.onerror = playFanfare;
+      audio.play().catch(playFanfare);
+    } else {
+      playFanfare();
+    }
     confetti({
       particleCount: 150,
       spread: 70,
@@ -504,11 +514,11 @@ const App: React.FC = () => {
         <div className="absolute bottom-4 sm:bottom-6 lg:bottom-10 right-4 sm:right-6 lg:right-10 flex flex-col gap-2 sm:gap-4 z-30">
           <button onClick={givePointToAll} className="bg-white p-3 sm:p-4 lg:p-6 rounded-full shadow-2xl text-2xl sm:text-4xl lg:text-5xl hover:scale-110 transition-all border-2 sm:border-4 border-emerald-500 group relative">
             🏆
-            <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs sm:text-sm font-black px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">+1 PT TOUS !</span>
+            <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-base font-black px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">+1 PT TOUS !</span>
           </button>
           <button onClick={shuffleChallenges} className="bg-white p-3 sm:p-4 lg:p-6 rounded-full shadow-2xl text-2xl sm:text-4xl lg:text-5xl hover:scale-110 transition-all border-2 sm:border-4 border-amber-400 group relative">
             🔀
-            <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-xs sm:text-sm font-black px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">MÉLANGER !</span>
+            <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-base font-black px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">MÉLANGER !</span>
           </button>
           <button onClick={() => setIsWheelSettingsOpen(true)} className="bg-white p-3 sm:p-4 lg:p-6 rounded-full shadow-2xl text-2xl sm:text-4xl lg:text-6xl hover:rotate-90 transition-all duration-500 border-2 sm:border-4 border-emerald-500">⚙️</button>
         </div>
@@ -519,7 +529,7 @@ const App: React.FC = () => {
             <div className="bg-white rounded-[2rem] sm:rounded-[3rem] lg:rounded-[4rem] p-4 sm:p-8 lg:p-12 w-full max-w-7xl max-h-[90vh] overflow-y-auto border-[6px] sm:border-[8px] lg:border-[12px] border-emerald-500 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-6 sm:mb-10">
                 <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black text-emerald-900 uppercase">Paramètres</h3>
-                <button onClick={() => setIsWheelSettingsOpen(false)} className="text-3xl sm:text-4xl lg:text-6xl font-black">✕</button>
+                <button onClick={() => setIsWheelSettingsOpen(false)} aria-label="Fermer les paramètres" className="text-3xl sm:text-4xl lg:text-6xl font-black text-red-600 p-2">✕</button>
               </div>
 
               {/* Audio Settings */}
@@ -542,8 +552,9 @@ const App: React.FC = () => {
                     </select>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-lg sm:text-2xl font-black text-emerald-700 uppercase">SON DE FINALE (URL) :</label>
-                    <input type="text" value={finaleSoundUrl} onChange={e => setFinaleSoundUrl(e.target.value)} className="text-sm sm:text-xl p-3 sm:p-4 rounded-xl border-2 border-emerald-200 outline-none" />
+                    <label className="text-lg sm:text-2xl font-black text-emerald-700 uppercase">SON DE FINALE (facultatif) :</label>
+                    <p className="text-base sm:text-lg font-bold text-emerald-700">Laisse vide pour la fanfare intégrée, ou colle un lien vers un fichier son.</p>
+                    <input type="text" placeholder="Fanfare intégrée" value={finaleSoundUrl} onChange={e => setFinaleSoundUrl(e.target.value)} className="text-sm sm:text-xl p-3 sm:p-4 rounded-xl border-2 border-emerald-200 outline-none" />
                   </div>
                 </div>
               </div>
@@ -577,8 +588,8 @@ const App: React.FC = () => {
                       <div key={p.id} className="bg-white p-3 sm:p-4 rounded-xl flex items-center justify-between shadow-sm border border-teal-100">
                         <span className="text-sm sm:text-xl font-black text-teal-900 truncate mr-2 sm:mr-4 uppercase">{p.name}</span>
                         <div className="flex gap-2">
-                          <button onClick={() => loadPreset(p)} className="bg-emerald-100 text-emerald-700 px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-bold text-xs sm:text-sm">CHARGER</button>
-                          <button onClick={() => deletePreset(p.id)} className="text-red-400 hover:text-red-600 text-xl">✕</button>
+                          <button onClick={() => loadPreset(p)} className="bg-emerald-100 text-emerald-700 px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-bold text-base">CHARGER</button>
+                          <button onClick={() => deletePreset(p.id)} aria-label={`Supprimer ${p.name}`} className="text-red-600 hover:text-red-700 text-2xl p-1">✕</button>
                         </div>
                       </div>
                     ))}
@@ -617,6 +628,9 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+        {notice && (
+          <MessageModal title="Information" message={notice} buttons={[{ label: "OK", onClick: () => setNotice(null) }]} onClose={() => setNotice(null)} />
         )}
       </div>
     </div>

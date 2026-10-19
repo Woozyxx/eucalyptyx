@@ -15,3 +15,37 @@ body {
 .animate-spin-wheel {
   animation: spin-ease-out 5s cubic-bezier(0.15, 0, 0.15, 1) forwards;
 }
+
+/* --- Accessibilité --- */
+
+/* Focus bien visible (clavier, télécommande TV) */
+:focus-visible {
+  outline: 6px solid #f59e0b;
+  outline-offset: 4px;
+  border-radius: 0.75rem;
+}
+
+/* Pas de texte minuscule sur petits écrans */
+@media (max-width: 639.98px) {
+  .text-xs, .text-sm {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+}
+
+/* Moins de mouvement pour ceux qui le demandent */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Police facile à lire (bouton « Aa ») */
+.dyslexia body,
+.dyslexia .font-kids {
+  font-family: 'Lexend', 'Verdana', sans-serif !important;
+  letter-spacing: 0.03em;
+}
