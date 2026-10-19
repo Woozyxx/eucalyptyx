@@ -146,6 +146,8 @@ const App: React.FC = () => {
   // Game State
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+  const [challengePlayer, setChallengePlayer] = useState('');
+  const [challengeResult, setChallengeResult] = useState<string | null>(null);
   const [winningIndex, setWinningIndex] = useState<number | null>(null);
   const [isDescriptionVisible, setIsDescriptionVisible] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -327,6 +329,7 @@ const App: React.FC = () => {
   const spinWheel = () => {
     if (isSpinning || challenges.length === 0) return;
     setSelectedChallenge(null);
+    setChallengeResult(null);
     setIsDescriptionVisible(false);
     setIsSpinning(true);
 
@@ -339,6 +342,7 @@ const App: React.FC = () => {
       const result = challenges[index];
       setWinningIndex(index);
       setSelectedChallenge(result);
+      setChallengePlayer(players[currentPlayerIndex]?.name || 'TOI');
       speak(`Défi pour ${players[currentPlayerIndex]?.name || 'toi'} : ${result.text}`);
     }, 5000);
   };
@@ -353,19 +357,23 @@ const App: React.FC = () => {
     setShowLeaderboard(false);
   };
 
-  const handleChallengeAction = (keep: boolean) => {
-    if (selectedChallenge) {
-      if (players.length > 0 && players[currentPlayerIndex]) {
-        setCurrentPlayerIndex((currentPlayerIndex + 1) % players.length);
-      }
-      
-      if (!keep && winningIndex !== null) {
-        setChallenges(challenges.filter((_, i) => i !== winningIndex));
-      }
-      
-      setSelectedChallenge(null);
-      setWinningIndex(null);
+  // Applique le choix mais garde la fenêtre ouverte pour pouvoir finir de lire.
+  const handleChallengeAction = (keep: boolean, allPoint = false) => {
+    if (!selectedChallenge || challengeResult) return;
+    if (allPoint) givePointToAll();
+    if (players.length > 0 && players[currentPlayerIndex]) {
+      setCurrentPlayerIndex((currentPlayerIndex + 1) % players.length);
     }
+    if (!keep && winningIndex !== null) {
+      setChallenges(challenges.filter((_, i) => i !== winningIndex));
+    }
+    setWinningIndex(null);
+    setChallengeResult(allPoint ? '+1 point pour tout le monde ! 🏆' : keep ? 'Défi gardé dans la roue 🔁' : 'Défi enlevé de la roue 🗑️');
+  };
+
+  const closeChallenge = () => {
+    setSelectedChallenge(null);
+    setChallengeResult(null);
   };
 
   // --- RENDERING ---
@@ -463,7 +471,7 @@ const App: React.FC = () => {
         {selectedChallenge && !isSpinning && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center bg-emerald-900/80 p-4 sm:p-6 lg:p-10 backdrop-blur-xl">
             <div className="bg-white rounded-[2rem] sm:rounded-[3rem] lg:rounded-[5rem] p-6 sm:p-8 lg:p-16 max-w-6xl w-full text-center shadow-2xl border-[8px] sm:border-[12px] lg:border-[24px] border-amber-400 animate-in zoom-in duration-300 overflow-y-auto max-h-[90vh]">
-              <p className="text-sm sm:text-xl lg:text-4xl font-black text-amber-600 mb-2 sm:mb-4 lg:mb-6 uppercase tracking-widest">DÉFI POUR {players[currentPlayerIndex]?.name || 'TOI'}</p>
+              <p className="text-sm sm:text-xl lg:text-4xl font-black text-amber-600 mb-2 sm:mb-4 lg:mb-6 uppercase tracking-widest">DÉFI POUR {challengePlayer}</p>
               <h3 className="text-xl sm:text-4xl md:text-6xl lg:text-8xl font-black text-blue-700 leading-tight mb-4 sm:mb-8 lg:mb-12">"{selectedChallenge.text}"</h3>
               
               <div className="flex flex-col gap-4 lg:gap-6">
@@ -475,11 +483,18 @@ const App: React.FC = () => {
                   </div>
                 )}
                 
-                <div className="flex flex-wrap gap-2 sm:gap-4 lg:gap-8 justify-center mt-4 lg:mt-8">
-                  <button onClick={() => { givePointToAll(); handleChallengeAction(true); }} className="bg-amber-400 text-white px-4 sm:px-8 lg:px-16 py-3 sm:py-4 lg:py-8 rounded-xl sm:rounded-2xl lg:rounded-[2.5rem] text-sm sm:text-2xl lg:text-4xl font-black shadow-[0_4px_0_rgb(180,83,9)] sm:shadow-[0_8px_0_rgb(180,83,9)] lg:shadow-[0_12px_0_rgb(180,83,9)] hover:scale-105 transition-all">1PT POUR TOUS 🏆</button>
-                  <button onClick={() => handleChallengeAction(true)} className="bg-emerald-500 text-white px-4 sm:px-8 lg:px-16 py-3 sm:py-4 lg:py-8 rounded-xl sm:rounded-2xl lg:rounded-[2.5rem] text-sm sm:text-2xl lg:text-4xl font-black shadow-[0_4px_0_rgb(5,150,105)] sm:shadow-[0_8px_0_rgb(5,150,105)] lg:shadow-[0_12px_0_rgb(5,150,105)] hover:scale-105 transition-all">GARDER LE DÉFI 🔁</button>
-                  <button onClick={() => handleChallengeAction(false)} className="bg-red-500 text-white px-4 sm:px-8 lg:px-16 py-3 sm:py-4 lg:py-8 rounded-xl sm:rounded-2xl lg:rounded-[2.5rem] text-sm sm:text-2xl lg:text-4xl font-black shadow-[0_4px_0_rgb(153,27,27)] sm:shadow-[0_8px_0_rgb(153,27,27)] lg:shadow-[0_12px_0_rgb(153,27,27)] hover:scale-105 transition-all">ENLEVER LE DÉFI 🗑️</button>
-                </div>
+                {challengeResult ? (
+                  <div className="flex flex-col items-center gap-4 lg:gap-8 mt-4 lg:mt-8">
+                    <p className="text-lg sm:text-3xl lg:text-5xl font-black text-emerald-700" role="status">{challengeResult}</p>
+                    <button onClick={closeChallenge} className="bg-blue-500 text-white px-4 sm:px-8 lg:px-16 py-3 sm:py-4 lg:py-8 rounded-xl sm:rounded-2xl lg:rounded-[2.5rem] text-base sm:text-2xl lg:text-4xl font-black shadow-[0_4px_0_rgb(29,78,216)] sm:shadow-[0_8px_0_rgb(29,78,216)] lg:shadow-[0_12px_0_rgb(29,78,216)] hover:scale-105 transition-all">FERMER ✕</button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2 sm:gap-4 lg:gap-8 justify-center mt-4 lg:mt-8">
+                    <button onClick={() => handleChallengeAction(true, true)} className="bg-amber-400 text-white px-4 sm:px-8 lg:px-16 py-3 sm:py-4 lg:py-8 rounded-xl sm:rounded-2xl lg:rounded-[2.5rem] text-base sm:text-2xl lg:text-4xl font-black shadow-[0_4px_0_rgb(180,83,9)] sm:shadow-[0_8px_0_rgb(180,83,9)] lg:shadow-[0_12px_0_rgb(180,83,9)] hover:scale-105 transition-all">1PT POUR TOUS 🏆</button>
+                    <button onClick={() => handleChallengeAction(true)} className="bg-emerald-500 text-white px-4 sm:px-8 lg:px-16 py-3 sm:py-4 lg:py-8 rounded-xl sm:rounded-2xl lg:rounded-[2.5rem] text-base sm:text-2xl lg:text-4xl font-black shadow-[0_4px_0_rgb(5,150,105)] sm:shadow-[0_8px_0_rgb(5,150,105)] lg:shadow-[0_12px_0_rgb(5,150,105)] hover:scale-105 transition-all">GARDER LE DÉFI 🔁</button>
+                    <button onClick={() => handleChallengeAction(false)} className="bg-red-500 text-white px-4 sm:px-8 lg:px-16 py-3 sm:py-4 lg:py-8 rounded-xl sm:rounded-2xl lg:rounded-[2.5rem] text-base sm:text-2xl lg:text-4xl font-black shadow-[0_4px_0_rgb(153,27,27)] sm:shadow-[0_8px_0_rgb(153,27,27)] lg:shadow-[0_12px_0_rgb(153,27,27)] hover:scale-105 transition-all">ENLEVER LE DÉFI 🗑️</button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
